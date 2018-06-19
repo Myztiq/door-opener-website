@@ -1,0 +1,23 @@
+.app-configureContainer {
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  background-color: white;
+}
+.app-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  background-color: #50514F;
+  min-height: 100vh;
+  width: 100%;
+}
+.app-welcomeText {
+  color: #50514F;
+}
+.app-buttonSpacer {
+  margin-bottom: 24px;
+  width: 80%;
+}
