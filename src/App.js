@@ -1,5 +1,9 @@
 import React, { Component } from 'react';
 import './App.css';
+import DoorOpen from './images/DoorOpen.js'
+import DoorClosed from './images/DoorClosed.js'
+import Cogs from './images/Cogs.js'
+import Truck from './images/Truck.js'
 
 export default class App extends Component {
   constructor (props) {
@@ -10,11 +14,17 @@ export default class App extends Component {
       loading: true,
       error: null,
       saved: false,
-      openDuration: 4
+      openDuration: 4,
+      isOpenOnDeliveryActive: false,
+      openOnNextBuzzActive: false,
+      runningOpenDoor: false,
+      runningOpenOnDelivery: false,
+      runningOpenOnBuzz: false
     }
   }
 
   openDoor = () => {
+    this.setState({runningOpenDoor: true})
     window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/openDoor`, {
       method: 'POST',
       headers: {
@@ -22,9 +32,13 @@ export default class App extends Component {
       },
       body: `access_token=${encodeURIComponent(this.state.accessToken)}&args=${this.state.openDuration * 1000}`
     })
+      .then(() => {
+        this.setState({runningOpenDoor: false})
+      })
   }
 
   openOnNextBuzz = () => {
+    this.setState({runningOpenOnBuzz: true})
     window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/openOnBuzz`, {
       method: 'POST',
       headers: {
@@ -34,6 +48,26 @@ export default class App extends Component {
     })
       .then(() => {
         this.pollForNextBuzzStatus()
+          .then(() => {
+            this.setState({runningOpenOnBuzz: false})
+          })
+      })
+  }
+
+  toggleOpenForDelivery = () => {
+    this.setState({runningOpenOnDelivery: true})
+    window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/openOnDeliv`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: `access_token=${encodeURIComponent(this.state.accessToken)}&args=${this.state.openDuration * 1000}`
+    })
+      .then(() => {
+        this.pollForNextDeliveryStatus()
+          .then(() => {
+            this.setState({runningOpenOnDelivery: false})
+          })
       })
   }
 
@@ -55,10 +89,34 @@ export default class App extends Component {
       })
   }
 
+  updateNextDeliveryStatus = () => {
+    return window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/openOnDeliv?access_token=${this.state.accessToken}`, {
+      method: 'GET'
+    })
+      .then((res) => {
+        return res.json()
+      })
+      .then((openOnDelivery) => {
+        const isOpenOnDeliveryActive = openOnDelivery.result
+        if (isOpenOnDeliveryActive !== this.state.isOpenOnDeliveryActive) {
+          this.setState({
+            isOpenOnDeliveryActive: isOpenOnDeliveryActive
+          })
+        }
+        return isOpenOnDeliveryActive
+      })
+  }
+
   pollForNextBuzzStatus = () => {
-    this.updateNextBuzzStatus()
     clearInterval(this.fetchStatusInterval)
     this.fetchStatusInterval = setInterval(this.updateNextBuzzStatus, 5000)
+    return this.updateNextBuzzStatus()
+  }
+
+  pollForNextDeliveryStatus = () => {
+    clearInterval(this.fetchDeliveryInterval)
+    this.fetchDeliveryInterval = setInterval(this.updateNextDeliveryStatus, 5000)
+    return this.updateNextDeliveryStatus()
   }
 
   componentDidMount () {
@@ -79,6 +137,9 @@ export default class App extends Component {
       this.updateNextBuzzStatus()
       clearInterval(this.longFetchStatusInterval)
       this.longFetchStatusInterval = setInterval(this.updateNextBuzzStatus, 30000)
+      this.updateNextDeliveryStatus()
+      clearInterval(this.longFetchDeliveryInterval)
+      this.longFetchDeliveryInterval = setInterval(this.updateNextDeliveryStatus, 30000)
     }
   }
 
@@ -92,6 +153,9 @@ export default class App extends Component {
         this.updateNextBuzzStatus()
         clearInterval(this.longFetchStatusInterval)
         this.longFetchStatusInterval = setInterval(this.updateNextBuzzStatus, 30000)
+        this.updateNextDeliveryStatus()
+        clearInterval(this.longFetchDeliveryInterval)
+        this.longFetchDeliveryInterval = setInterval(this.updateNextDeliveryStatus, 30000)
       }
       this.setState({
         saved: true
@@ -116,54 +180,74 @@ export default class App extends Component {
   }
 
   renderHasConfiguration () {
+    const getButtonClass = (flag) => {
+      let className = 'btn btn-primary btn-lg btn-block'
+      if (this.state[flag]) {
+        className += ' loading disabled'
+      }
+      return className
+    }
     return <div className='app-container'>
       <div className='app-buttonSpacer'>
-        <input
-          className='btn btn-primary btn-lg btn-block'
+        <div
+          className={getButtonClass('runningOpenDoor')}
           onClick={this.openDoor}
-          value='Open Now'
-          type='button'
-        />
+        >
+          <DoorOpen />
+          Open Now
+        </div>
       </div>
       <div className='app-buttonSpacer'>
-        <input
-          className='btn btn-primary btn-lg btn-block'
+        <div
+          className={getButtonClass('runningOpenOnBuzz')}
           onClick={this.openOnNextBuzz}
-          value={this.state.openOnNextBuzzActive ? 'Cancel Open On Buzz' : 'Open On Next Buzz'}
-          type='button'
-        />
+        >
+          {this.state.openOnNextBuzzActive ? <DoorOpen /> : <DoorClosed />}
+          {this.state.openOnNextBuzzActive ? 'Cancel Open On My Buzz' : 'Open On My Buzz'}
+        </div>
       </div>
       <div className='app-buttonSpacer'>
-        <input
+        <div
+          className={getButtonClass('runningOpenOnDelivery')}
+          onClick={this.toggleOpenForDelivery}
+        >
+
+          {this.state.isOpenOnDeliveryActive ? <DoorOpen /> : <Truck />}
+          {this.state.isOpenOnDeliveryActive ? 'Cancel Open On Delivery' : 'Open On Next Delivery'}
+        </div>
+      </div>
+      <div className='app-buttonSpacer'>
+        <div
           className='btn btn-primary btn-lg btn-block'
           onClick={this.triggerEdit}
-          value='Change Configuration'
-          type='button'
-        />
+        >
+          <Cogs />
+          Change Configuration
+        </div>
       </div>
     </div>
   }
 
   renderHasNoConfiguration() {
     return <div>
-      <div style={{fontSize: 30, color: '#70C1B3'}}>Welcome!</div>
-      <div className='app-welcomeText'>I need some info to be able to open your door:</div>
+      <div style={{fontSize: 30, color: '#70C1B3'}}>Configuration</div>
       <div className='app-welcomeText'>Access Token</div>
       <input
-        style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+        className='form-input'
         onChange={(evt) => this.setState({accessToken: evt.currentTarget.value})}
         defaultValue={this.state.accessToken}
         placeholder='Access Token'
       />
       <div>Particle ID</div>
       <input
-        style={{height: 40, borderColor: 'gray', borderWidth: 1}}
+        className='form-input'
         onChange={(evt) => this.setState({particleId: evt.currentTarget.value})}
         defaultValue={this.state.particleId}
         placeholder='Particle ID'
       />
       <div className='app-welcomeText'>Open Duration</div>
       <select
+        className='form-select'
         value={this.state.openDuration}
         onChange={(evt) => this.setState({openDuration: evt.currentTarget.value})}
       >
@@ -184,7 +268,7 @@ export default class App extends Component {
       <div style={{marginTop: 20}}>
         <input
           type='button'
-          name='check'
+          className='btn btn-primary btn-lg btn-block'
           color="#50514F"
           onClick={this.saveForm}
           value='Save Configuration'
