@@ -2,7 +2,7 @@
 var doCache = true;
 
 // Name our cache
-var CACHE_NAME = 'door-opener-v1';
+var CACHE_NAME = 'door-opener-v2';
 
 // Delete old caches that are not our current one!
 self.addEventListener("activate", event => {

@@ -1,11 +1,12 @@
 {
+  "version": 1,
   "name": "Door Opener",
   "short_name": "Door Opener",
   "theme_color": "#2196f3",
   "background_color": "#2196f3",
   "display": "fullscreen",
   "Scope": "/",
-  "start_url": "/index.html",
+  "start_url": "/index.html?123",
   "icons": [
     {
       "src": "images/icons/icon-72x72.png",
