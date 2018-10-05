@@ -4,6 +4,7 @@ import DoorOpen from './images/DoorOpen.js'
 import DoorClosed from './images/DoorClosed.js'
 import Cogs from './images/Cogs.js'
 import Truck from './images/Truck.js'
+import Party from './images/Party.js'
 
 export default class App extends Component {
   constructor (props) {
@@ -19,8 +20,16 @@ export default class App extends Component {
       openOnNextBuzzActive: false,
       runningOpenDoor: false,
       runningOpenOnDelivery: false,
-      runningOpenOnBuzz: false
+      runningOpenOnBuzz: false,
+      runningPartyMode: false,
+      isPartyModeActive: false,
     }
+
+    setTimeout(() => {
+      this.pollForNextBuzzStatus()
+      this.pollForNextDeliveryStatus()
+      this.pollForPartyStatus()
+    }, 0)
   }
 
   openDoor = () => {
@@ -71,6 +80,23 @@ export default class App extends Component {
       })
   }
 
+  togglePartyMode = () => {
+    this.setState({runningPartyMode: true})
+    window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/partyMode`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: `access_token=${encodeURIComponent(this.state.accessToken)}&args=${this.state.openDuration * 1000}`
+    })
+      .then(() => {
+        this.pollForPartyStatus()
+          .then(() => {
+            this.setState({runningPartyMode: false})
+          })
+      })
+  }
+
   updateNextBuzzStatus = () => {
     return window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/openOnBuzz?access_token=${this.state.accessToken}`, {
       method: 'GET'
@@ -107,6 +133,25 @@ export default class App extends Component {
       })
   }
 
+  updatePartyStatus = () => {
+    return window.fetch(`https://api.particle.io/v1/devices/${this.state.particleId}/partyMode?access_token=${this.state.accessToken}`, {
+      method: 'GET'
+    })
+      .then((res) => {
+        return res.json()
+      })
+      .then((partyStatus) => {
+
+        const isPartyModeActive = partyStatus.result
+        if (isPartyModeActive !== this.state.isPartyModeActive) {
+          this.setState({
+            isPartyModeActive: isPartyModeActive
+          })
+        }
+        return isPartyModeActive
+      })
+  }
+
   pollForNextBuzzStatus = () => {
     clearInterval(this.fetchStatusInterval)
     this.fetchStatusInterval = setInterval(this.updateNextBuzzStatus, 5000)
@@ -117,6 +162,12 @@ export default class App extends Component {
     clearInterval(this.fetchDeliveryInterval)
     this.fetchDeliveryInterval = setInterval(this.updateNextDeliveryStatus, 5000)
     return this.updateNextDeliveryStatus()
+  }
+
+  pollForPartyStatus = () => {
+    clearInterval(this.fetchPartyStatusInterval)
+    this.fetchPartyStatusInterval = setInterval(this.updatePartyStatus, 5000)
+    return this.updatePartyStatus()
   }
 
   componentDidMount () {
@@ -214,6 +265,16 @@ export default class App extends Component {
 
           {this.state.isOpenOnDeliveryActive ? <DoorOpen /> : <Truck />}
           {this.state.isOpenOnDeliveryActive ? 'Cancel Open On Delivery' : 'Open On Next Delivery'}
+        </div>
+      </div>
+      <div className='app-buttonSpacer'>
+        <div
+          className={getButtonClass('runningPartyMode')}
+          onClick={this.togglePartyMode}
+        >
+
+          {this.state.isPartyModeActive ? <DoorOpen /> : <Party />}
+          {this.state.isPartyModeActive ? 'Cancel Party Mode' : 'Start Party Mode'}
         </div>
       </div>
       <div className='app-buttonSpacer'>
